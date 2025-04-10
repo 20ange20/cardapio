@@ -98,6 +98,9 @@ app.put("/pratos/:id/preco", async (req, res) => {
 });
 
 app.listen(3000, () => console.log("Servidor rodando na porta 3000!"));
+app.get("/", function(req,res) {
+    res.sendFile(__dirname+"/index.html");
+})
 
 function showSection(section) {
     const pratosSection = document.getElementById("pratosSection");

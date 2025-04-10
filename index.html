@@ -177,16 +177,18 @@
             dishes.forEach(dish => {
                 dishList.innerHTML += `
                     <tr>
-                        <td>${dish._id}</td>
-                        <td>${dish.nome}</td>
-                        <td>R$ ${dish.preco.toFixed(2)}</td>
-                        <td>${dish.categoria}</td>
-                        <td>${dish.restaurant_id}</td>
-                        <td>
-                            <button onclick="updatePrice('${dish._id}')">Editar Preço</button>
-                            <button onclick="deleteDish('${dish._id}')">Excluir</button>
-                        </td>
-                    </tr>
+    <td>${dish._id}</td>
+    <td>${dish.nome}</td>
+    <td>R$ ${dish.preco.toFixed(2)}</td>
+    <td>${dish.categoria}</td>
+    <td>${dish.restaurant_id}</td>
+    <td>
+      <div class="button-group">
+        <button onclick="updatePrice('${dish._id}')">Editar Preço</button>
+        <button onclick="deleteDish('${dish._id}')">Excluir</button>
+      </div>
+    </td>
+  </tr>
                 `;
             });
         }
