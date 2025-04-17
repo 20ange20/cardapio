@@ -1,51 +1,68 @@
+
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ObjectId } = require("mongodb");
+const mysql = require('mysql2/promise');
+const path = require("path");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const uri = "mongodb+srv://angelica:strongpassword@cardapio.ktl0dsm.mongodb.net/?retryWrites=true&w=majority&appName=Cardapio";
-const client = new MongoClient(uri);
+const dbConfig = {
+    host: 'switchback.proxy.rlwy.net',
+    port: 54582,
+    user: 'root',
+    password: 'XGHNbPlETOYsCGhxymjHVeJmVaTZdtiZ',
+    database: 'railway',
+};
 
 async function connectDB() {
-    await client.connect();
-    return client.db("CardapioDB");
+    const connection = await mysql.createConnection(dbConfig);
+    return connection;
 }
 
-// Criar nova categoria (evita duplicatas)
+// Rotas para Categorias
+
 app.post("/categorias", async (req, res) => {
     const { nome } = req.body;
     if (!nome) return res.status(400).json({ error: "Nome da categoria é obrigatório." });
 
-    const db = await connectDB();
-    const categoriaExistente = await db.collection("categorias").findOne({ nome });
-
-    if (categoriaExistente) {
-        return res.status(400).json({ error: "Categoria já existe!" });
+    try {
+        const db = await connectDB();
+        const [existe] = await db.execute("SELECT id FROM categorias WHERE nome = ?", [nome]);
+        if (existe.length > 0) {
+            return res.status(400).json({ error: "Categoria já existe!" });
+        }
+        const [result] = await db.execute("INSERT INTO categorias (nome) VALUES (?)", [nome]);
+        res.json({ id: result.insertId, nome, message: "Categoria cadastrada com sucesso!" });
+    } catch (err) {
+        res.status(500).json({ error: "Erro ao cadastrar categoria." });
     }
-
-    const result = await db.collection("categorias").insertOne({ nome });
-    res.json({ _id: result.insertedId, nome, message: "Categoria cadastrada com sucesso!" });
 });
 
-// Listar todas as categorias
 app.get("/categorias", async (req, res) => {
-    const db = await connectDB();
-    const categorias = await db.collection("categorias").find().toArray();
-    res.json(categorias);
+    try {
+        const db = await connectDB();
+        const [categorias] = await db.execute("SELECT * FROM categorias");
+        res.json(categorias);
+    } catch (err) {
+        res.status(500).json({ error: "Erro ao buscar categorias." });
+    }
 });
 
-// Excluir categoria
 app.delete("/categorias/:id", async (req, res) => {
     const { id } = req.params;
-    const db = await connectDB();
-    await db.collection("categorias").deleteOne({ _id: new ObjectId(id) });
-    res.json({ message: "Categoria excluída com sucesso!" });
+    try {
+        const db = await connectDB();
+        await db.execute("DELETE FROM categorias WHERE id = ?", [id]);
+        res.json({ message: "Categoria excluída com sucesso!" });
+    } catch (err) {
+        res.status(500).json({ error: "Erro ao excluir categoria." });
+    }
 });
 
-// Criar prato associando a uma categoria existente
+// Rotas para Pratos
+
 app.post("/pratos", async (req, res) => {
     const { nome, preco, categoriaId, restaurant_id } = req.body;
 
@@ -53,74 +70,69 @@ app.post("/pratos", async (req, res) => {
         return res.status(400).json({ error: "Todos os campos são obrigatórios!" });
     }
 
-    const db = await connectDB();
-    const categoria = await db.collection("categorias").findOne({ _id: new ObjectId(categoriaId) });
+    try {
+        const db = await connectDB();
 
-    if (!categoria) return res.status(400).json({ error: "Categoria não encontrada." });
+        const [cat] = await db.execute("SELECT nome FROM categorias WHERE id = ?", [categoriaId]);
+        if (cat.length === 0) return res.status(400).json({ error: "Categoria não encontrada." });
 
-    const result = await db.collection("pratos").insertOne({ 
-        nome, 
-        preco: parseFloat(preco), 
-        categoria: categoria.nome, 
-        restaurant_id 
-    });
+        const categoriaNome = cat[0].nome;
 
-    res.json({ _id: result.insertedId, nome, preco, categoria: categoria.nome, restaurant_id, message: "Prato cadastrado com sucesso!" });
+        const [result] = await db.execute(
+            "INSERT INTO pratos (nome, preco, categoria_id, categoria_nome, restaurant_id) VALUES (?, ?, ?, ?, ?)",
+            [nome, preco, categoriaId, categoriaNome, restaurant_id]
+        );
+
+        res.json({
+            id: result.insertId,
+            nome,
+            preco,
+            categoria: categoriaNome,
+            restaurant_id,
+            message: "Prato cadastrado com sucesso!"
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Erro ao cadastrar prato." });
+    }
 });
 
-// Listar todos os pratos
 app.get("/pratos", async (req, res) => {
-    const db = await connectDB();
-    const pratos = await db.collection("pratos").find().toArray();
-    res.json(pratos);
+    try {
+        const db = await connectDB();
+        const [pratos] = await db.execute("SELECT * FROM pratos");
+        res.json(pratos);
+    } catch (err) {
+        res.status(500).json({ error: "Erro ao buscar pratos." });
+    }
 });
 
-// Excluir prato
 app.delete("/pratos/:id", async (req, res) => {
     const { id } = req.params;
-    const db = await connectDB();
-    await db.collection("pratos").deleteOne({ _id: new ObjectId(id) });
-    res.json({ message: "Prato excluído com sucesso!" });
+    try {
+        const db = await connectDB();
+        await db.execute("DELETE FROM pratos WHERE id = ?", [id]);
+        res.json({ message: "Prato excluído com sucesso!" });
+    } catch (err) {
+        res.status(500).json({ error: "Erro ao excluir prato." });
+    }
 });
 
-// Atualizar preço do prato
 app.put("/pratos/:id/preco", async (req, res) => {
     const { id } = req.params;
     const { preco } = req.body;
 
-    const db = await connectDB();
-    await db.collection("pratos").updateOne(
-        { _id: new ObjectId(id) },
-        { $set: { preco: parseFloat(preco) } }
-    );
+    try {
+        const db = await connectDB();
+        await db.execute("UPDATE pratos SET preco = ? WHERE id = ?", [preco, id]);
+        res.json({ message: "Preço atualizado com sucesso!" });
+    } catch (err) {
+        res.status(500).json({ error: "Erro ao atualizar preço." });
+    }
+});
 
-    res.json({ message: "Preço atualizado com sucesso!" });
+// Servir index.html
+app.get("/", function(req, res) {
+    res.sendFile(path.join(__dirname, "index.html"));
 });
 
 app.listen(3000, () => console.log("Servidor rodando na porta 3000!"));
-app.get("/", function(req,res) {
-    res.sendFile(__dirname+"/index.html");
-})
-
-function showSection(section) {
-    const pratosSection = document.getElementById("pratosSection");
-    const categoriasSection = document.getElementById("categoriasSection");
-    const btnPratos = document.getElementById("btnPratos");
-    const btnCategorias = document.getElementById("btnCategorias");
-
-    // Mostrar a seção selecionada
-    if (section === "pratos") {
-        pratosSection.style.display = "block";
-        categoriasSection.style.display = "none";
-        btnPratos.classList.add("active");
-        btnCategorias.classList.remove("active");
-    } else {
-        pratosSection.style.display = "none";
-        categoriasSection.style.display = "block";
-        btnCategorias.classList.add("active");
-        btnPratos.classList.remove("active");
-    }
-}
-
-;
-
