@@ -1,14 +1,12 @@
 Gerenciador de Cardápio de Restaurante
 
-Sistema permite o cadastro de categorias para serem utilizadas no casdastro de pratos. Backend com Node.js + Express e MongoDB.
+Sistema permite o cadastro de categorias para serem utilizadas no casdastro de pratos. Backend com Node.js + Express e MySQL
 - JavaScript (fetch API).
 
 Comandos:
 
 git clone https://github.com/20ange20/cardapio.git
-cd cardapio
 npm init -y
-npm install express cors mongodb
 node servidor.js
 
 Exemplo de criar categoria:
